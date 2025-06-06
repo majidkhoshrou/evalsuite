@@ -1,0 +1,31 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Poetry virtual environment folder (if created inside project)
+.venv/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# VSCode settings
+.vscode/
+
+# Mac OS system files
+.DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and temporary files
+*.log
+*.tmp
