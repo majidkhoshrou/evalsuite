@@ -4,22 +4,42 @@
 
 ## 🚀 Features
 
-- **Evaluation Metrics**  
-  Implementations of standard forecast error metrics such as `MAE`, `MAPE`, `sMAPE`, `wMAPE`, and various relative error metrics.
-- **Temporal Aggregation**  
-  Evaluate metrics over different time frequencies (e.g., daily, quarterly) using `calculate_metrics(...)`.
-- **Calendar-Based Evaluation**  
-  Assess forecast accuracy across different calendar types (e.g., holidays, weekends) with `evaluate_calendar_types(...)`.
-- **Data Cleaning Utilities**  
-  Functions to clean and preprocess time series data, ensuring robustness in analysis.
-- **Utility Functions**  
-  Helpers for loading and aggregating forecasts, evaluating consistency between forecast iterations, merging and clipping DataFrames, and generating summaries.
+- 📊 Clean and preprocess datasets with ease
+- 📈 Calculate a wide range of evaluation metrics
+- 💰 Perform pricing evaluations and economic analysis
+- 📉 Generate plots and visualizations
+- 🧰 Handy utility functions for data manipulation
 
-## 📦 Installation
+## Installation
 
-Clone the repository and install dependencies:
+To install EvalSuite, clone the repository and install its dependencies:
 
 ```bash
 git clone https://github.com/majidkhoshrou/evalsuite.git
 cd evalsuite
 pip install -r requirements.txt
+
+
+from evalsuite import datacleaning, metrics, plotting, pricing, utils
+
+# Example: Cleaning a DataFrame
+cleaned_df = datacleaning.clean(df)
+
+# Example: Calculating MAE
+mae = metrics.mean_absolute_error(y_true, y_pred)
+
+# Example: Plotting time series
+plotting.plot_timeseries(df)
+
+# Example: Running pricing model
+pricing_result = pricing.evaluate_pricing_model(inputs)
+
+
+evalsuite/
+├── __init__.py
+├── datacleaning.py
+├── metrics.py
+├── plotting.py
+├── pricing.py
+├── utils.py
+└── README.md
