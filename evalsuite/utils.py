@@ -180,44 +180,93 @@ def merge_dataframes(dataframes_list):
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-def monthly_yearly_format(df, value_col, aggfunc):
+def time_aggregate_format(df, value_col, aggfunc, time_units=None):
     """
-    Transforms a time-series DataFrame to show the monthly average of a specified column 
-    for each available year.
+    Aggregates a time-series DataFrame by specified datetime components,
+    applying an aggregation function on a given column.
+
+    Supports special units:
+      - 'quarter_hour': 15-minute intervals (0-3 per hour)
+      - 'time': exact time of day as datetime.time objects (hour:minute:second)
 
     Parameters:
-    df (pd.DataFrame): Input DataFrame with a datetime index.
-    value_col (str): Name of the column to aggregate.
+    -----------
+    df : pd.DataFrame
+        Input DataFrame with a datetime index.
+    value_col : str
+        Name of the column to aggregate.
+    aggfunc : function or str
+        Aggregation function to apply (e.g., 'mean', 'sum', np.mean).
+    time_units : list of str, optional
+        List of datetime components to aggregate by, in order.
+        Supported units: 'year', 'month', 'day', 'hour', 'minute', 'second',
+                         'quarter_hour', 'time'.
+        Default is ['month', 'year'].
 
     Returns:
-    pd.DataFrame: Pivoted DataFrame with months as index and years as columns,
-                  containing average monthly values of the specified column.
+    --------
+    pd.DataFrame
+        Pivoted DataFrame with the first time unit as index and subsequent
+        units as columns, containing aggregated values of the specified column.
+
+    Raises:
+    -------
+    ValueError:
+        If the DataFrame index is not datetime,
+        or if value_col does not exist,
+        or if an unsupported time unit is requested.
     """
     df = df.copy()
 
-    # Ensure the index is datetime
     if not pd.api.types.is_datetime64_any_dtype(df.index):
-        raise ValueError("DataFrame index must be of datetime type.")
+        raise ValueError("DataFrame index must be datetime.")
 
-    # Ensure the specified column exists
     if value_col not in df.columns:
-        raise ValueError(f"Column '{value_col}' not found in DataFrame.")
+        raise ValueError(f"Column '{value_col}' not found.")
 
-    # Extract year and month from the index
-    df['year'] = df.index.year
-    df['month'] = df.index.month
+    if time_units is None:
+        time_units = ['month', 'year']
 
-    # Pivot to get average value by month and year
-    df = df.pivot_table(
-        index='month',
-        columns='year',
-        values=value_col,
-        aggfunc=aggfunc
-    )
+    supported_units = {
+        'year': df.index.year,
+        'month': df.index.month,
+        'day': df.index.day,
+        'date': df.index.date,
+        'hour': df.index.hour,
+        'minute': df.index.minute,
+        'second': df.index.second,
+        'time': df.index.time,
+        # quarter_hour handled below
+    }
 
-    return df
+    for unit in time_units:
+        if unit not in supported_units and unit != 'quarter_hour':
+            raise ValueError(f"Unsupported time unit '{unit}'. Supported units: "
+                             f"{list(supported_units.keys()) + ['quarter_hour']}")
+
+    for unit in time_units:
+        if unit == 'quarter_hour':
+            df[unit] = df.index.minute // 15
+        else:
+            df[unit] = supported_units[unit]
+
+    index_unit = time_units[0]
+    columns_units = time_units[1:] if len(time_units) > 1 else None
+
+    if columns_units:
+        result = df.pivot_table(
+            index=index_unit,
+            columns=columns_units,
+            values=value_col,
+            aggfunc=aggfunc
+        )
+    else:
+        result = df.groupby(index_unit)[value_col].agg(aggfunc)
+
+    return result
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
+
 
 def clip_dataframe_percentiles(df, lower_percentile=0.001, upper_percentile=None):
     """
