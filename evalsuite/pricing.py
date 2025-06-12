@@ -3,10 +3,9 @@ import os
 import pandas as pd
 import numpy as np
 import logging
-from typing import List
-from typing import Union
+from typing import List, Union
 
-from utils import set_tz, merge_dataframes
+from evalsuite.utils import set_tz, merge_dataframes
 
 logger = logging.getLogger(__name__)
 

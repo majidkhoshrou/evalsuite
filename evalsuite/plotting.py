@@ -7,7 +7,7 @@ import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from metrics import *
+from evalsuite.metrics import *
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
