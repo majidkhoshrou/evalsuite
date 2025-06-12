@@ -1,32 +1,43 @@
 
 import pandas as pd
+import numpy as np
 import os
 import re
 from functools import reduce
-from typing import Callable, Optional
+from typing import Callable, Optional, Union, List
+from datetime import tzinfo
+from pandas import Series, DataFrame
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-def set_tz(df):
+def set_tz(df: DataFrame, target_tz: Union[str, tzinfo] = 'UTC') -> DataFrame:
     """
-    Ensure the DataFrame index is timezone-aware and converted to UTC.
+    Ensure the DataFrame index is timezone-aware and converted to the specified timezone (default: UTC).
 
-    If the index is naive (no timezone), it is localized to UTC.
-    If the index is timezone-aware, it is converted to UTC.
+    If the index is naive (no timezone), it is localized to the target timezone.
+    If the index is timezone-aware, it is converted to the target timezone.
 
     Parameters:
         df (pd.DataFrame): Input DataFrame with a datetime index.
+        target_tz (str or tzinfo): Timezone to convert to (default is 'UTC').
 
     Returns:
-        pd.DataFrame: A copy of the input DataFrame with the index in UTC.
+        pd.DataFrame: A copy of the input DataFrame with the index in the specified timezone.
     """
     df = df.copy()
-    df.index = pd.to_datetime(df.index)
-    
-    if df.index.tz is None:
-        df.index = df.index.tz_localize('utc')
+
+    try:
+        df.index = pd.to_datetime(df.index)
+    except Exception as e:
+        raise ValueError("DataFrame index could not be converted to datetime.") from e
+
+    if df.empty:
+        df.index = df.index.tz_localize(target_tz, ambiguous='NaT', nonexistent='NaT')
+    elif df.index.tz is None:
+        df.index = df.index.tz_localize(target_tz)
     else:
-        df.index = df.index.tz_convert('utc')
+        df.index = df.index.tz_convert(target_tz)
+
     return df
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
@@ -87,7 +98,6 @@ def load_testbed_forecasts(testbed_run_dir, additional_str:str = ''):
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-
 def collect_and_concat_forecasts(
     run_dir_base: str,
     max_iter: Optional[int] = None,
@@ -138,18 +148,19 @@ def collect_and_concat_forecasts(
     forecasts_all = pd.concat(forecasts_all_dict, axis=1).droplevel(0, axis=1)
     return forecasts_all
 
-
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-def evaluate_forecasts_consistency(X):
+def evaluate_forecasts_consistency(X: DataFrame) -> DataFrame:
     """
-    Evaluate the consistency of forecasts by calculating the relative variability of each forecast.
+    Evaluate the consistency of forecasts by calculating the relative variability
+    (coefficient of variation) across forecasts for each row, and add it as a new column.
 
     Parameters:
-        X (pd.DataFrame): DataFrame containing forecast columns.
+        X (pd.DataFrame): DataFrame where each column is a forecast.
 
     Returns:
-        pd.Series: Series containing the relative variability of each forecast.
+        pd.DataFrame: The original DataFrame with an added column
+                      'forecasts_relative_variability' containing std / mean per row.
     """
     X = X.copy()
     X['forecasts_mean'] = X.mean(axis=1)
@@ -180,9 +191,14 @@ def merge_dataframes(dataframes_list):
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-def time_aggregate_format(df, value_col, aggfunc, time_units=None):
+def time_aggregate_format(
+    df: Union[pd.DataFrame, pd.Series],
+    value_col: Optional[str] = None,
+    aggfunc: Union[str, Callable] = 'mean',
+    time_units: Optional[List[str]] = None
+) -> pd.DataFrame:
     """
-    Aggregates a time-series DataFrame by specified datetime components,
+    Aggregates a time-series DataFrame or Series by specified datetime components,
     applying an aggregation function on a given column.
 
     Supports special units:
@@ -191,11 +207,11 @@ def time_aggregate_format(df, value_col, aggfunc, time_units=None):
 
     Parameters:
     -----------
-    df : pd.DataFrame
-        Input DataFrame with a datetime index.
-    value_col : str
-        Name of the column to aggregate.
-    aggfunc : function or str
+    df : pd.DataFrame or pd.Series
+        Input with a datetime index.
+    value_col : str, optional
+        Name of the column to aggregate (ignored if df is a Series).
+    aggfunc : function or str, default='mean'
         Aggregation function to apply (e.g., 'mean', 'sum', np.mean).
     time_units : list of str, optional
         List of datetime components to aggregate by, in order.
@@ -207,22 +223,31 @@ def time_aggregate_format(df, value_col, aggfunc, time_units=None):
     --------
     pd.DataFrame
         Pivoted DataFrame with the first time unit as index and subsequent
-        units as columns, containing aggregated values of the specified column.
+        units as columns, containing aggregated values.
 
     Raises:
     -------
     ValueError:
-        If the DataFrame index is not datetime,
-        or if value_col does not exist,
-        or if an unsupported time unit is requested.
+        If the index is not datetime,
+        or if value_col is required but not found,
+        or if unsupported time units are given.
     """
-    df = df.copy()
+    # Convert Series to DataFrame
+    if isinstance(df, pd.Series):
+        if df.name is None:
+            df = df.to_frame(name='value')
+        else:
+            df = df.to_frame()
+        value_col = df.columns[0]
+    else:
+        df = df.copy()
+        if value_col is None:
+            raise ValueError("value_col must be provided when using a DataFrame.")
+        if value_col not in df.columns:
+            raise ValueError(f"Column '{value_col}' not found in DataFrame.")
 
     if not pd.api.types.is_datetime64_any_dtype(df.index):
         raise ValueError("DataFrame index must be datetime.")
-
-    if value_col not in df.columns:
-        raise ValueError(f"Column '{value_col}' not found.")
 
     if time_units is None:
         time_units = ['month', 'year']
@@ -236,7 +261,6 @@ def time_aggregate_format(df, value_col, aggfunc, time_units=None):
         'minute': df.index.minute,
         'second': df.index.second,
         'time': df.index.time,
-        # quarter_hour handled below
     }
 
     for unit in time_units:
@@ -266,7 +290,6 @@ def time_aggregate_format(df, value_col, aggfunc, time_units=None):
     return result
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
-
 
 def clip_dataframe_percentiles(df, lower_percentile=0.001, upper_percentile=None):
     """
@@ -321,6 +344,46 @@ def add_percentile_means(df, percentiles=('P50', 'P70', 'P90'), suffix_template=
     return df
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
+
+def flatten_multiindex_to_timestamp(obj: Union[Series, DataFrame]) -> Union[Series, DataFrame]:
+    """
+    Converts a Series or DataFrame with a MultiIndex (time, date)
+    into one with a single datetime index.
+
+    Parameters:
+    obj (Union[pd.Series, pd.DataFrame]): Object with MultiIndex (time, date)
+
+    Returns:
+    Union[pd.Series, pd.DataFrame]: Same type as input, with timestamp index
+    """
+    if not isinstance(obj, (Series, DataFrame)):
+        raise TypeError("Input must be a pandas Series or DataFrame.")
+    
+    if not isinstance(obj.index, pd.MultiIndex) or obj.index.nlevels != 2:
+        raise ValueError("Index must be a MultiIndex with exactly two levels: (time, date).")
+    
+    # Try to access named levels 'time' and 'date' if available
+    level_names = obj.index.names
+    try:
+        time_level = obj.index.get_level_values('time')
+        date_level = obj.index.get_level_values('date')
+    except (KeyError, ValueError):
+        # Fallback to positional index
+        time_level = obj.index.get_level_values(0)
+        date_level = obj.index.get_level_values(1)
+
+    # Combine into datetime
+    timestamps = pd.to_datetime(date_level.astype(str) + ' ' + time_level.astype(str))
+
+    # Replace index
+    obj_new = obj.copy()
+    obj_new.index = timestamps
+    obj_new.index.name = 'timestamp'
+    obj_new.sort_index(inplace=True)
+
+    return obj_new
+
+
 
 
 
