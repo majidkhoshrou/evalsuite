@@ -2,20 +2,23 @@
 name = "evalsuite"
 version = "0.1.0"
 description = "Modular evaluation toolkit for data analysis"
-authors = [
-    { name = "Majid Khoshrou" }
-]
+authors = [ { name = "Majid Khoshrou" } ]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "pandas",
-    "numpy",
-    "plotly",
-    "seaborn",
-    "matplotlib"
+  "pandas",
+  "numpy",
+  "plotly",
+  "seaborn",
+  "matplotlib"
 ]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["evalsuite"]
+
