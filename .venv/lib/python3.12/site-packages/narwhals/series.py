@@ -13,6 +13,15 @@ from typing import (
     overload,
 )
 
+from narwhals._utils import (
+    _validate_rolling_arguments,
+    ensure_type,
+    generate_repr,
+    is_compliant_series,
+    is_index_selector,
+    parse_version,
+    supports_arrow_c_stream,
+)
 from narwhals.dependencies import is_numpy_scalar
 from narwhals.dtypes import _validate_dtype
 from narwhals.exceptions import ComputeError
@@ -23,15 +32,6 @@ from narwhals.series_str import SeriesStringNamespace
 from narwhals.series_struct import SeriesStructNamespace
 from narwhals.translate import to_native
 from narwhals.typing import IntoSeriesT
-from narwhals.utils import (
-    _validate_rolling_arguments,
-    ensure_type,
-    generate_repr,
-    is_compliant_series,
-    is_index_selector,
-    parse_version,
-    supports_arrow_c_stream,
-)
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from narwhals._compliant import CompliantSeries
+    from narwhals._utils import Implementation
     from narwhals.dataframe import DataFrame, MultiIndexSelector
     from narwhals.dtypes import DType
     from narwhals.typing import (
@@ -55,7 +56,6 @@ if TYPE_CHECKING:
         TemporalLiteral,
         _1DArray,
     )
-    from narwhals.utils import Implementation
 
 
 class Series(Generic[IntoSeriesT]):
@@ -620,8 +620,10 @@ class Series(Generic[IntoSeriesT]):
     def any(self) -> bool:
         """Return whether any of the values in the Series are True.
 
+        If there are no non-null elements, the result is `False`.
+
         Notes:
-          Only works on Series of data type Boolean.
+            Only works on Series of data type Boolean.
 
         Returns:
             A boolean indicating if any values in the Series are True.
@@ -638,6 +640,8 @@ class Series(Generic[IntoSeriesT]):
 
     def all(self) -> bool:
         """Return whether all values in the Series are True.
+
+        If there are no non-null elements, the result is `True`.
 
         Returns:
             A boolean indicating if all values in the Series are True.
@@ -712,6 +716,8 @@ class Series(Generic[IntoSeriesT]):
 
     def sum(self) -> float:
         """Reduce this Series to the sum value.
+
+        If there are no non-null elements, the result is zero.
 
         Returns:
             The sum of all elements in the Series.
