@@ -1,8 +1,8 @@
 [project]
 name = "evalsuite"
-version = "0.1.0"
+version = "0.1.2"
 description = "Modular evaluation toolkit for data analysis"
-authors = [ { name = "Majid Khoshrou" } ]
+authors = [{ name = "Majid Khoshrou" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.12"
@@ -18,7 +18,17 @@ dependencies = [
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["evalsuite"]
 
+[tool.uv]
+dev-dependencies = [
+  "pytest",
+  "mypy",
+  "ruff",
+  "black"
+]
