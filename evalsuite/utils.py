@@ -7,6 +7,7 @@ from functools import reduce
 from typing import Callable, Optional, Union, List
 from datetime import tzinfo
 from pandas import Series, DataFrame
+from typing import Literal
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
@@ -147,6 +148,61 @@ def collect_and_concat_forecasts(
 
     forecasts_all = pd.concat(forecasts_all_dict, axis=1).droplevel(0, axis=1)
     return forecasts_all
+
+## -----------------------------------------------------------------------------------------------------------------------------#
+
+def add_percentile_means(
+    df: pd.DataFrame,
+    on_invalid: Literal["raise", "ignore"] = "raise",
+    suffix_template: str = ''
+) -> pd.DataFrame:
+    """
+    Adds mean columns for each percentile group (e.g., P50, P90) based on column name prefixes.
+
+    Percentile columns must start with 'Pxx_' (e.g., 'P50_', 'P90_'). For each group, a new column
+    '<Pxx>_mean_<suffix_template>_all' is added with the row-wise mean.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame with percentile benchmark columns.
+    on_invalid : {'raise', 'ignore'}, default='raise'
+        How to handle columns not matching 'Pxx_' pattern.
+    suffix_template : str, default=''
+        Optional string to include in the new column names.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with added mean columns.
+
+    Raises
+    ------
+    ValueError
+        If invalid columns are found and `on_invalid='raise'`.
+    """
+    valid_pattern = re.compile(r'^P\d+_')
+    valid_cols = [c for c in df.columns if valid_pattern.match(c)]
+    invalid_cols = [c for c in df.columns if not valid_pattern.match(c)]
+
+    if invalid_cols:
+        if on_invalid == "raise":
+            raise ValueError(
+                f"The following columns do not start with a valid percentile pattern 'Pxx_': {invalid_cols}"
+            )
+        elif on_invalid != "ignore":
+            raise ValueError("`on_invalid` must be 'raise' or 'ignore'.")
+
+    percentiles = list(set([p.split('_')[0] for p in valid_cols]))
+
+    df = df.copy()
+    for P in percentiles:
+        cols = df.filter(like=P).columns
+        if cols.size:
+            new_col_name = f'{P}_mean_{suffix_template}_all'
+            df[new_col_name] = df[cols].mean(axis=1)
+
+    return df
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
@@ -311,37 +367,6 @@ def clip_dataframe_percentiles(df, lower_percentile=0.001, upper_percentile=None
     lower = df.quantile(lower_percentile)
     upper = df.quantile(upper_percentile)
     return df.clip(lower=lower, upper=upper, axis=1)
-
-## -----------------------------------------------------------------------------------------------------------------------------#
-
-def add_percentile_means(df, percentiles=('P50', 'P70', 'P90'), suffix_template=''):
-    """
-    For each percentile code in `percentiles`, find all columns whose names
-    contain that code (e.g. 'P50') and add a new column using the
-    `suffix_template`, which supports formatting with {P}.
-    
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Input forecast dataframe.
-    percentiles : tuple[str], default ('P50','P70','P90')
-        Percentile tags to look for.
-    suffix_template : str, default '{P}_mean_all_iter'
-        Format string for the new column name. Use '{P}' as a placeholder.
-    
-    Returns
-    -------
-    pandas.DataFrame
-        The dataframe with new mean columns added (same object, not a copy).
-    """
-
-    df = df.copy()
-    for P in percentiles:
-        cols = df.filter(like=P).columns
-        if cols.size:
-            new_col_name = f'{P}_mean_all_{suffix_template}'
-            df[new_col_name] = df[cols].mean(axis=1)
-    return df
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
