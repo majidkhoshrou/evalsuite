@@ -1,13 +1,12 @@
 
-import pandas as pd
-import numpy as np
 import os
 import re
-from functools import reduce
-from typing import Callable, Optional, Union, List
-from datetime import tzinfo
+import numpy as np
+import pandas as pd
 from pandas import Series, DataFrame
-from typing import Literal
+from functools import reduce
+from typing import Callable, Optional, Union, List, Literal
+from datetime import tzinfo
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
@@ -70,7 +69,6 @@ def process_forecasts_file(file_path, tAhead=39, quantiles_to_drop=None):
         df = df.drop(columns=[col for col in quantiles_to_drop if col in df.columns])
 
     return df
-
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
@@ -226,16 +224,13 @@ def evaluate_forecasts_consistency(X: DataFrame) -> DataFrame:
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-def merge_dataframes(dataframes_list):
+def merge_dataframes(dataframes_list: List[DataFrame], how: str = 'inner') -> DataFrame:
     """
-    Merges a list of pandas DataFrames on their indices using an inner join.
-
-    This function takes a list of DataFrames and merges them sequentially on their indices.
-    All DataFrames must have compatible indices for the merge to succeed.
+    Merges a list of pandas DataFrames on their indices using the specified join method.
 
     Parameters:
-        dataframes_list (list of pd.DataFrame): List of pandas DataFrames to merge.
-            The merge is performed in the order of the list.
+        dataframes_list (List[pd.DataFrame]): List of pandas DataFrames to merge.
+        how (str): Type of merge to be performed – 'left', 'right', 'outer', 'inner'. Default is 'inner'.
 
     Returns:
         pd.DataFrame: A single DataFrame resulting from merging all input DataFrames on their indices.
@@ -243,7 +238,13 @@ def merge_dataframes(dataframes_list):
     Raises:
         ValueError: If the input list is empty.
     """
-    return reduce(lambda left, right: left.merge(right, left_index=True, right_index=True), dataframes_list)
+    if not dataframes_list:
+        raise ValueError("The input list of DataFrames is empty.")
+
+    return reduce(
+        lambda left, right: left.merge(right, left_index=True, right_index=True, how=how),
+        dataframes_list
+    )
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
