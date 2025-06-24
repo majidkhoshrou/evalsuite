@@ -7,7 +7,6 @@ from pandas import Series, DataFrame
 from functools import reduce
 from typing import Callable, Optional, Union, List, Literal
 from datetime import tzinfo
-
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
 def set_tz(df: DataFrame, target_tz: Union[str, tzinfo] = 'UTC') -> DataFrame:
@@ -107,45 +106,36 @@ def collect_and_concat_forecasts(
 ) -> pd.DataFrame:
     """
     Load and concatenate forecast data from multiple experiment iterations.
-
-    Parameters:
-        run_dir_base (str): Base directory where experiment subdirectories are located.
-        max_iter (int, optional): Number of iterations to collect (starts from 1 to max_iter - 1).
-                                  If None, automatically detect the maximum iteration number.
-        loader_func (Callable[[str, str], pd.DataFrame], optional): Function to load forecasts 
-                                  from a given path and optional suffix.
-        iter_dir_pattern (str): Format string to construct iteration folder name. 
-                                Must include one placeholder '{}'.
-        sub_dir (str): Subdirectory within each iteration folder where forecast files are stored.
-        suffix_prefix (str): Prefix to add before iteration number in the additional string 
-                             passed to the loader.
-
-    Returns:
-        pd.DataFrame: Concatenated DataFrame of forecasts from all iterations (columns aligned).
     """
     forecasts_all_dict: dict[str, pd.DataFrame] = {}
 
-    if max_iter is None:
-        # Auto-detect iteration numbers based on folder names
-        pattern_prefix = iter_dir_pattern.split('{}')[0]
-        iter_dirs = [d for d in os.listdir(run_dir_base) if d.startswith(pattern_prefix)]
-        iter_nums = [int(re.search(r'(\d+)', d).group(1)) for d in iter_dirs if re.search(r'(\d+)', d)]
-        if not iter_nums:
-            raise ValueError("No iteration directories found.")
-        max_iter = max(iter_nums) + 1
+    # Auto-detect iteration folders
+    pattern_prefix = iter_dir_pattern.split('{}')[0]
+    iter_dirs = [d for d in os.listdir(run_dir_base) if d.startswith(pattern_prefix)]
+    iter_nums = sorted({
+        int(re.search(r'(\d+)', d).group(1))
+        for d in iter_dirs if re.search(r'(\d+)', d)
+    })
 
-    for iter_num in range(1, max_iter):
+    if not iter_nums:
+        raise ValueError("No iteration directories found.")
+
+    if max_iter is not None:
+        iter_nums = [i for i in iter_nums if i < max_iter]
+
+    for iter_num in iter_nums:
         try:
             iter_dir_name = iter_dir_pattern.format(iter_num)
             iter_path = os.path.join(run_dir_base, iter_dir_name, sub_dir)
             additional_str = f'{suffix_prefix}{iter_num}'
             forecasts = loader_func(iter_path, additional_str) if loader_func else pd.DataFrame()
+            forecasts_all_dict[f'iter_{iter_num}'] = forecasts
         except Exception as e:
-            print(e)
-        forecasts_all_dict[f'iter_{iter_num}'] = forecasts
+            print(f"Error loading iteration {iter_num}: {e}")
 
     forecasts_all = pd.concat(forecasts_all_dict, axis=1).droplevel(0, axis=1)
     return forecasts_all
+
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
