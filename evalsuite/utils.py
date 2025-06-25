@@ -1,12 +1,15 @@
 
 import os
 import re
+import logging
+from functools import reduce
+from datetime import tzinfo
+from typing import Callable, Optional, Union, List, Literal
+
 import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
-from functools import reduce
-from typing import Callable, Optional, Union, List, Literal
-from datetime import tzinfo
+
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
 def set_tz(df: DataFrame, target_tz: Union[str, tzinfo] = 'UTC') -> DataFrame:
@@ -96,9 +99,12 @@ def load_testbed_forecasts(testbed_run_dir, additional_str:str = ''):
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
+# Configure basic logging (you can customize this as needed in your main script)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def collect_and_concat_forecasts(
     run_dir_base: str,
-    max_iter: Optional[int] = None,
     loader_func: Optional[Callable[[str, str], pd.DataFrame]] = None,
     iter_dir_pattern: str = 'load_training_period_90d_iter_{}',
     sub_dir: str = 'CONTINUON_BEST',
@@ -106,36 +112,52 @@ def collect_and_concat_forecasts(
 ) -> pd.DataFrame:
     """
     Load and concatenate forecast data from multiple experiment iterations.
+
+    Parameters:
+        run_dir_base (str): Base directory containing iteration subdirectories.
+        loader_func (Optional[Callable[[str, str], pd.DataFrame]]): 
+            Function to load forecast data. It should take a path and a string suffix as arguments.
+            If not provided, empty DataFrames will be used.
+        iter_dir_pattern (str): Format string pattern for iteration directories. Must contain '{}' placeholder.
+        sub_dir (str): Subdirectory inside each iteration folder where forecast data resides.
+        suffix_prefix (str): Prefix to append before iteration number in the suffix passed to the loader.
+
+    Returns:
+        pd.DataFrame: Concatenated forecast DataFrame from all iterations.
+
+    Raises:
+        ValueError: If no matching directories are found or no data is successfully loaded.
     """
+    if '{}' not in iter_dir_pattern:
+        raise ValueError("iter_dir_pattern must contain '{}' as a placeholder for iteration number.")
+
+    pattern_prefix = iter_dir_pattern.split('{}')[0]
+    all_dirs = os.listdir(run_dir_base)
+    all_pattern_prefix_dirs = [d for d in all_dirs if d.startswith(pattern_prefix)]
+
+    if not all_pattern_prefix_dirs:
+        raise ValueError('No directory matching given pattern was found!')
+
+    logger.info(f'{len(all_pattern_prefix_dirs)} matching directories found: {all_pattern_prefix_dirs}')
+
     forecasts_all_dict: dict[str, pd.DataFrame] = {}
 
-    # Auto-detect iteration folders
-    pattern_prefix = iter_dir_pattern.split('{}')[0]
-    iter_dirs = [d for d in os.listdir(run_dir_base) if d.startswith(pattern_prefix)]
-    iter_nums = sorted({
-        int(re.search(r'(\d+)', d).group(1))
-        for d in iter_dirs if re.search(r'(\d+)', d)
-    })
-
-    if not iter_nums:
-        raise ValueError("No iteration directories found.")
-
-    if max_iter is not None:
-        iter_nums = [i for i in iter_nums if i < max_iter]
-
-    for iter_num in iter_nums:
+    for d in all_pattern_prefix_dirs:
         try:
-            iter_dir_name = iter_dir_pattern.format(iter_num)
-            iter_path = os.path.join(run_dir_base, iter_dir_name, sub_dir)
+            iter_path = os.path.join(run_dir_base, d, sub_dir)
+            iter_num = d.split('_')[-1]
             additional_str = f'{suffix_prefix}{iter_num}'
             forecasts = loader_func(iter_path, additional_str) if loader_func else pd.DataFrame()
             forecasts_all_dict[f'iter_{iter_num}'] = forecasts
         except Exception as e:
-            print(f"Error loading iteration {iter_num}: {e}")
+            logger.warning(f"Error loading iteration {d}: {e}")
 
-    forecasts_all = pd.concat(forecasts_all_dict, axis=1).droplevel(0, axis=1)
+    if not forecasts_all_dict:
+        raise ValueError("No forecast data was successfully loaded.")
+
+    forecasts_all = pd.concat(forecasts_all_dict, axis=1)
+    forecasts_all.columns = forecasts_all.columns.droplevel(0) if isinstance(forecasts_all.columns, pd.MultiIndex) else forecasts_all.columns
     return forecasts_all
-
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
