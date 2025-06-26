@@ -130,10 +130,11 @@ def collect_and_concat_forecasts(
     """
     if '{}' not in iter_dir_pattern:
         raise ValueError("iter_dir_pattern must contain '{}' as a placeholder for iteration number.")
-
-    pattern_prefix = iter_dir_pattern.split('{}')[0]
+    
     all_dirs = os.listdir(run_dir_base)
-    all_pattern_prefix_dirs = [d for d in all_dirs if d.startswith(pattern_prefix)]
+    pattern_prefix = iter_dir_pattern.split('{}')[0]
+    pattern = re.compile(rf'^{re.escape(pattern_prefix)}\d+$')
+    all_pattern_prefix_dirs = [d for d in all_dirs if pattern.fullmatch(d)]
 
     if not all_pattern_prefix_dirs:
         raise ValueError('No directory matching given pattern was found!')
@@ -420,6 +421,47 @@ def flatten_multiindex_to_timestamp(obj: Union[Series, DataFrame]) -> Union[Seri
     obj_new.sort_index(inplace=True)
 
     return obj_new
+
+## -----------------------------------------------------------------------------------------------------------------------------#
+
+def post_process_calculate_metrics_results(df: DataFrame) -> DataFrame:
+    """
+    Processes a results DataFrame by:
+    - Extracting a common suffix from column names (e.g., 'metric_experiment1' → 'experiment1').
+    - Renaming columns to keep only the prefix.
+    - Adding an 'Experiment' column if all columns share the same suffix.
+    - Flattening the datetime index to dates for cleaner plotting.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame with column names formatted as 'prefix_suffix'.
+
+    Returns:
+        pd.DataFrame: Processed DataFrame with renamed columns, experiment label, and updated index.
+
+    Raises:
+        ValueError: If multiple unique suffixes are found in column names.
+    """
+    df = df.copy()
+
+    # Extract suffixes (everything after the first underscore)
+    suffixes: List[str] = list(set('_'.join(col.split('_')[1:]) for col in df.columns))
+    
+    if len(suffixes) == 1:
+        df["Experiment"] = suffixes[0]
+    else:
+        raise ValueError(f"Multiple groups of columns found: {suffixes}")
+
+    # Rename columns to only the prefix (before first underscore)
+    df.columns = [col.split('_')[0] for col in df.columns]
+
+    # Convert datetime index to plain dates if applicable
+    if hasattr(df.index, "date"):
+        df.index = df.index.date
+
+    return df
+
+## -----------------------------------------------------------------------------------------------------------------------------#
+
 
 
 

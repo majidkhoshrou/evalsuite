@@ -287,4 +287,65 @@ def process_and_plot_calendar_types(
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
+def compare_monthly_metrics(
+    monthly_results_dict: dict,
+    output_dir: str = '.',
+    title: str = 'Monthly MAPE Comparison',
+    output_filename: str = 'mape_results'
+) -> None:
+    """
+    Combine experiment DataFrames from a dictionary, reshape them, and plot a monthly comparison of P50 and P90 metrics.
+
+    Parameters
+    ----------
+    monthly_results_dict : dict
+        Dictionary where values are DataFrames with an 'Experiment' column, 'P50', 'P90' columns, and a datetime index.
+    output_dir : str
+        Directory to save the output plot.
+    title : str, optional
+        Title for the plot (default: 'Monthly MAPE Comparison').
+    output_filename : str, optional
+        File name for the saved plot (default: 'mape_results').
+    """
+    df_list = []
+
+    for df in monthly_results_dict.values():
+        temp_df = df.copy()
+        temp_df.index.name = 'Month'
+        temp_df = temp_df.reset_index()
+
+        if 'Experiment' not in temp_df.columns:
+            raise ValueError("Each DataFrame must include an 'Experiment' column.")
+
+        df_list.append(temp_df)
+
+    combined_df = pd.concat(df_list, ignore_index=True)
+
+    melted_df = pd.melt(
+        combined_df,
+        id_vars=["Month", "Experiment"],
+        value_vars=["P50", "P90"],
+        var_name="Percentile",
+        value_name="MAPE"
+    )
+
+    melted_df['Experiment-Percentile'] = (
+        melted_df['Experiment'] + '-' + melted_df['Percentile']
+    )
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    barplot(
+        melted_df,
+        x='Month',
+        y='MAPE',
+        color='Experiment-Percentile',
+        sort_by_y=False,
+        output_dir=output_dir,
+        title=title,
+        output_filename=output_filename
+    )
+    
+## -----------------------------------------------------------------------------------------------------------------------------#
+
 
