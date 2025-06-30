@@ -290,25 +290,50 @@ def process_and_plot_calendar_types(
 def compare_monthly_metrics(
     monthly_results_dict: dict,
     output_dir: str = '.',
+    criterion: str = 'MAPE',
+    area: Optional[str] = None,
     title: str = 'Monthly MAPE Comparison',
     output_filename: str = 'mape_results'
 ) -> None:
     """
-    Combine experiment DataFrames from a dictionary, reshape them, and plot a monthly comparison of P50 and P90 metrics.
+    Combine experiment DataFrames from a dictionary, reshape them, and plot a monthly comparison of specified metrics.
+
+    This function takes a dictionary of DataFrames containing performance metrics (e.g., P50, P90) for different experiments.
+    It reshapes the data into long format and generates a bar plot comparing metrics across months and experiments.
 
     Parameters
     ----------
     monthly_results_dict : dict
-        Dictionary where values are DataFrames with an 'Experiment' column, 'P50', 'P90' columns, and a datetime index.
-    output_dir : str
-        Directory to save the output plot.
+        Dictionary where keys are experiment names and values are pandas DataFrames.
+        Each DataFrame must have:
+          - A datetime index representing months.
+          - An 'Experiment' column identifying the experiment.
+          - 'P50' and/or 'P90' columns (or other metrics).
+    output_dir : str, optional
+        Directory to save the output plot. Default is the current directory ('.').
+    criterion : str, optional
+        Name of the metric to plot (e.g., 'MAPE', 'RMSE'). Default is 'MAPE'.
+        This is used as the y-axis label.
+    area : Optional[str], optional
+        (Optional) Name of an area or group; not currently used but reserved for future extensions.
     title : str, optional
-        Title for the plot (default: 'Monthly MAPE Comparison').
+        Title of the plot. Default is 'Monthly MAPE Comparison'.
     output_filename : str, optional
-        File name for the saved plot (default: 'mape_results').
+        Base name for the saved plot file (without extension). Default is 'mape_results'.
+
+    Raises
+    ------
+    ValueError
+        If any input DataFrame does not include an 'Experiment' column.
+
+    Notes
+    -----
+    This function expects that a `barplot` function is defined elsewhere
+    which generates and saves the visualization.
     """
     df_list = []
 
+    # Prepare each DataFrame
     for df in monthly_results_dict.values():
         temp_df = df.copy()
         temp_df.index.name = 'Month'
@@ -319,33 +344,38 @@ def compare_monthly_metrics(
 
         df_list.append(temp_df)
 
+    # Combine all DataFrames into one
     combined_df = pd.concat(df_list, ignore_index=True)
 
+    # Reshape to long format (only P50 shown, adjust if needed)
     melted_df = pd.melt(
         combined_df,
         id_vars=["Month", "Experiment"],
-        value_vars=["P50", "P90"],
+        value_vars=["P50"],
         var_name="Percentile",
-        value_name="MAPE"
+        value_name=criterion
     )
 
+    # Create a combined label for coloring
     melted_df['Experiment-Percentile'] = (
         melted_df['Experiment'] + '-' + melted_df['Percentile']
     )
 
+    # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
+    # Generate bar plot
     barplot(
         melted_df,
         x='Month',
-        y='MAPE',
+        y=criterion,
         color='Experiment-Percentile',
         sort_by_y=False,
         output_dir=output_dir,
         title=title,
         output_filename=output_filename
     )
-    
+
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
 
