@@ -2,6 +2,7 @@
 import os
 import re
 import logging
+import shutil
 from functools import reduce
 from datetime import tzinfo
 from typing import Callable, Optional, Union, List, Literal
@@ -9,6 +10,9 @@ from typing import Callable, Optional, Union, List, Literal
 import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
+
+import smtplib
+from email.message import EmailMessage
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
@@ -461,6 +465,71 @@ def post_process_calculate_metrics_results(df: DataFrame) -> DataFrame:
     return df
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
+
+
+def zip_output_dir(output_dir: str) -> str:
+    """
+    Creates a ZIP archive of the given output directory.
+
+    Args:
+        output_dir (str): Path to the output directory.
+
+    Returns:
+        str: Path to the created ZIP archive.
+    """
+
+    zip_path = shutil.make_archive(output_dir, 'zip', output_dir)
+    print(f"Created ZIP archive at: {zip_path}")
+    return zip_path
+
+
+def send_email_with_attachment(
+    smtp_server: str,
+    smtp_port: int,
+    sender_email: str,
+    receiver_email: str,
+    subject: str,
+    body: str,
+    attachment_path: str,
+    smtp_user: str,
+    smtp_password: str
+):
+    """
+    Sends an email with the given attachment.
+
+    Args:
+        smtp_server (str): SMTP server address.
+        smtp_port (int): SMTP server port.
+        sender_email (str): Sender's email address.
+        receiver_email (str): Receiver's email address.
+        subject (str): Email subject.
+        body (str): Email body text.
+        attachment_path (str): Path to the file to attach.
+        smtp_user (str): Username for SMTP authentication.
+        smtp_password (str): Password for SMTP authentication.
+    """
+
+    msg = EmailMessage()
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+
+    with open(attachment_path, "rb") as f:
+        file_data = f.read()
+        file_name = os.path.basename(attachment_path)
+        msg.add_attachment(file_data, maintype="application", subtype="zip", filename=file_name)
+
+    print("Sending email...")
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        print("Email sent successfully!")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+
 
 
 
