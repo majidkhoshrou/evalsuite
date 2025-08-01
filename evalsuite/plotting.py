@@ -351,7 +351,7 @@ def compare_monthly_metrics(
     melted_df = pd.melt(
         combined_df,
         id_vars=["Month", "Experiment"],
-        value_vars=["P50"],
+        value_vars=["P50", "P90"],
         var_name="Percentile",
         value_name=criterion
     )
