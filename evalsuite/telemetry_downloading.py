@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-def get_measured_grid_area_data(
+def telemetry_get_measurements(
     url: str,
     cookie_str: str,
     start_date_str: str,
@@ -71,14 +71,14 @@ def get_measured_grid_area_data(
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-def get_forecasted_grid_area_data(
+def telemetry_get_forecasts(
     url: str,
     cookie_str: str,
     start_date_str: str,
     end_date_str: str,
     terminals: List[str],
     minimal_known_after: str = "P3D",
-    percentile: int = 50
+    percentiles: List[int] = [30, 50, 90]
 ) -> requests.Response:
     """
     Sends a POST request to get forecasted grid area data.
@@ -90,7 +90,7 @@ def get_forecasted_grid_area_data(
         end_date_str: ISO end date string.
         terminals: List of terminal IDs.
         minimal_known_after: ISO duration string (default "P3D").
-        percentile: Forecast percentile (default 50).
+        percentiles: List of forecast percentiles (default [30, 50, 90]).
 
     Returns:
         The HTTP response object from the requests library.
@@ -109,17 +109,7 @@ def get_forecasted_grid_area_data(
             "sort": "Asc"
         },
         "analogs": [
-            {
-                "measurementValueSource": "Forecasted",
-                "measurementType": "ActivePower",
-                "measurementSource": "DSO",
-                "unitMultiplier": "k",
-                "measuringPeriod": "FifteenMinute",
-                "phaseCode": "ABC",
-                "aggregation": "Average",
-                "minimalKnownAfter": minimal_known_after,
-                "percentile": percentile
-            },
+          
             {
                 "measurementValueSource": "Forecasted",
                 "measurementType": "ActiveEnergy",
@@ -131,6 +121,7 @@ def get_forecasted_grid_area_data(
                 "minimalKnownAfter": minimal_known_after,
                 "percentile": percentile
             }
+             for percentile in percentiles
         ]
     }
 
@@ -140,7 +131,67 @@ def get_forecasted_grid_area_data(
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
-def process_measured_response(
+def telemetry_get_external_forecasts(
+    url: str,
+    cookie_str: str,
+    start_date_str: str,
+    end_date_str: str,
+    terminals: List[str],
+    forecastVariant: str = "dexter",
+    percentiles: List[int] = [30, 50, 90]
+) -> requests.Response:
+    """
+    Sends a POST request to get forecasted grid area data.
+
+    Args:
+        url: The endpoint URL.
+        cookie_str: Raw cookie string for authentication.
+        start_date_str: ISO start date string.
+        end_date_str: ISO end date string.
+        terminals: List of terminal IDs.
+        minimal_known_after: ISO duration string (default "P3D").
+        percentiles: List of forecast percentiles (default [30, 50, 90]).
+
+    Returns:
+        The HTTP response object from the requests library.
+    """
+    headers: Dict[str, str] = {
+        "accept": "application/json",
+        "Content-Type": "application/json",
+        "Cookie": cookie_str
+    }
+
+    payload: Dict[str, Any] = {
+        "terminals": terminals,
+        "range": {
+            "start": start_date_str,
+            "end": end_date_str,
+            "sort": "Asc"
+        },
+        "analogs": [
+          
+            {
+                "measurementValueSource": "Forecasted",
+                "measurementType": "ActiveEnergy",
+                "measurementSource": "External",
+                "unitMultiplier": "k",
+                "measuringPeriod": "FifteenMinute",
+                "phaseCode": "ABC",
+                "aggregation": "Average",
+                "forecastVariant": forecastVariant,
+                "percentile": percentile
+            }
+             for percentile in percentiles
+        ]
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+
+    return response
+
+## -----------------------------------------------------------------------------------------------------------------------------#
+
+def process_measurements_response(
     response: Any,
     area_mrid_dict: Dict[str, str]
 ) -> Optional[pd.DataFrame]:
