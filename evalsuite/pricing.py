@@ -31,12 +31,21 @@ def get_settlement_apx_prices(data_dir):
 
     settlement_prices = pd.concat(
         pd.read_csv(os.path.join(settlement_prices_dir, f), delimiter=';')[
-            ['Timeinterval End Loc', 'Price Shortage', 'Price Surplus']
+            ['Timeinterval Start Loc', 'Price Shortage', 'Price Surplus']
         ]
         for f in settlement_prices_files
     )
-    settlement_prices = settlement_prices.rename(columns={'Timeinterval End Loc': 'datetimeFC'})
+    settlement_prices = settlement_prices.rename(columns={'Timeinterval Start Loc': 'datetimeFC'})
+
     settlement_prices = settlement_prices.set_index('datetimeFC')
+    settlement_prices.index = pd.to_datetime(settlement_prices.index, errors="coerce")
+
+    settlement_prices.index = (
+        pd.to_datetime(settlement_prices.index, errors="coerce")
+        .tz_localize("Europe/Amsterdam", nonexistent="shift_forward", ambiguous=True)
+        .tz_convert("UTC")
+    )
+
     settlement_prices = set_tz(settlement_prices)
 
     logger.info(f'Settlement price timestamps: {settlement_prices.index.min()} to {settlement_prices.index.max()}')

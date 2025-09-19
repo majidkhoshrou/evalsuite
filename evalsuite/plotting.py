@@ -49,16 +49,19 @@ def plot_timeseries(
         color_discrete_map=color_mapping  # Use custom color palette if provided
     )
 
+    # fig.update_yaxes(range=[0, timeseries_df.max(numeric_only=True).max() * 1.1])
+
+
     # Save outputs
     html_path = os.path.join(output_dir, f'{output_filename}.html')
     img_path = os.path.join(output_dir, f'{output_filename}.png')
 
-    fig.write_html(html_path)
-    fig.write_image(img_path)
+    # fig.write_html(html_path)
+    # fig.write_image(img_path)
 
     fig.write_html(html_path, auto_open=False)
     fig.update_layout(width=1500, height=600)
-    fig.write_image(img_path, format='png', scale=3)
+    fig.write_image(img_path, format='png', scale=2)
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
@@ -128,7 +131,7 @@ def barplot(eval_overall_df: pd.DataFrame, x: str, y: str,
 
     fig.write_html(html_path, auto_open=False)
     fig.update_layout(width=1500, height=600)
-    fig.write_image(img_path, format='png', scale=3)
+    fig.write_image(img_path, format='png', scale=4)
 
 ## -----------------------------------------------------------------------------------------------------------------------------#
 
